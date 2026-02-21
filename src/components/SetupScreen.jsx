@@ -86,6 +86,17 @@ export default function SetupScreen({ onStart, savedData }) {
           Last session: <span className="text-slate-500">{savedData.playerName}</span> · {savedData.bux} 🪙
         </p>
       )}
+
+      {/* Legal footer */}
+      <div className="mt-8 max-w-md text-center space-y-1">
+        <p className="text-slate-600 text-xs">
+          © {new Date().getFullYear()} Seed 13 Productions. All rights reserved.
+        </p>
+        <p className="text-slate-700 text-xs leading-relaxed">
+          For entertainment purposes only. This game does not involve real money, real wagering,
+          or any form of gambling. No actual currency or items of value may be won or lost.
+        </p>
+      </div>
     </div>
   )
 }
