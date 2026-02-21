@@ -34,7 +34,7 @@ export default function RaceTrack({ race, bets, players, onComplete }) {
         if (next.done && !completedRef.current) {
           completedRef.current = true
           clearInterval(intervalRef.current)
-          setTimeout(() => onComplete(next.finished), 1800)
+          setTimeout(() => onComplete(next.finished, next.dnf), 1800)
         }
 
         return next
@@ -96,19 +96,24 @@ export default function RaceTrack({ race, bets, players, onComplete }) {
           const pos = raceState.positions[horse.id] || 0
           const finishIdx = raceState.finished.indexOf(horse.id)
           const isFinished = finishIdx >= 0
+          const isDnf = raceState.dnf.includes(horse.id)
           const isBetHorse = humanBet?.horseId === horse.id
           const isCFB = raceState.comeFromBehind.activeHorse === horse.id
           const pct = 2 + pos * 89
+          // Non-DNF finishers get medals — DNF horses don't count toward placement
+          const placementIdx = isFinished && !isDnf
+            ? raceState.finished.filter(id => !raceState.dnf.includes(id)).indexOf(horse.id)
+            : -1
 
           return (
             <div
               key={horse.id}
               className={`flex-1 flex items-stretch rounded-xl overflow-hidden border min-h-0 ${
-                isBetHorse ? 'border-yellow-500' : 'border-slate-800'
+                isDnf ? 'border-slate-700 opacity-60' : isBetHorse ? 'border-yellow-500' : 'border-slate-800'
               }`}
             >
               {/* Left: horse info — fixed width */}
-              <div className="flex items-center gap-3 px-4 bg-slate-900 flex-shrink-0 w-56">
+              <div className={`flex items-center gap-3 px-4 flex-shrink-0 w-56 ${isDnf ? 'bg-slate-900/50' : 'bg-slate-900'}`}>
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0"
                   style={{ backgroundColor: horse.color }}
@@ -116,7 +121,7 @@ export default function RaceTrack({ race, bets, players, onComplete }) {
                   {horse.number}
                 </div>
                 <div className="min-w-0">
-                  <div className={`font-bold truncate ${isBetHorse ? 'text-yellow-400' : 'text-white'}`}>
+                  <div className={`font-bold truncate ${isBetHorse ? 'text-yellow-400' : isDnf ? 'text-slate-500' : 'text-white'}`}>
                     {horse.name}{isBetHorse ? ' ⭐' : ''}
                   </div>
                   <div className="text-slate-500 text-xs truncate">{horse.jockey}</div>
@@ -129,7 +134,7 @@ export default function RaceTrack({ race, bets, players, onComplete }) {
               </div>
 
               {/* Track — fills remaining width and full lane height */}
-              <div className="flex-1 bg-emerald-950 relative lane-track">
+              <div className={`flex-1 relative lane-track ${isDnf ? 'bg-slate-900' : 'bg-emerald-950'}`}>
                 <div
                   className="absolute top-0 bottom-0 w-px"
                   style={{
@@ -145,7 +150,7 @@ export default function RaceTrack({ race, bets, players, onComplete }) {
                     fontSize: 'clamp(1.5rem, 3vh, 2.5rem)',
                     lineHeight: 1,
                     transition: isFinished ? 'none' : `left ${GAME_CONFIG.RACE_UPDATE_INTERVAL_MS}ms linear`,
-                    filter: isCFB ? 'brightness(2) drop-shadow(0 0 10px orange)' : 'none',
+                    filter: isDnf ? 'grayscale(1) opacity(0.4)' : isCFB ? 'brightness(2) drop-shadow(0 0 10px orange)' : 'none',
                   }}
                 >
                   🐎
@@ -153,9 +158,11 @@ export default function RaceTrack({ race, bets, players, onComplete }) {
               </div>
 
               {/* Right: position — fixed width */}
-              <div className="flex items-center justify-center bg-slate-900 flex-shrink-0 w-16 border-l border-slate-800">
-                {isFinished ? (
-                  <span className="text-2xl">{MEDAL[finishIdx] || `#${finishIdx + 1}`}</span>
+              <div className={`flex items-center justify-center flex-shrink-0 w-16 border-l border-slate-800 ${isDnf ? 'bg-slate-900/50' : 'bg-slate-900'}`}>
+                {isDnf ? (
+                  <span className="text-xs font-black text-red-600">DNF</span>
+                ) : placementIdx >= 0 ? (
+                  <span className="text-2xl">{MEDAL[placementIdx] || `#${placementIdx + 1}`}</span>
                 ) : (
                   <span className="text-slate-500 text-xs tabular-nums">{Math.round(pos * 100)}%</span>
                 )}
@@ -173,10 +180,16 @@ export default function RaceTrack({ race, bets, players, onComplete }) {
             <div className="flex flex-wrap gap-x-5 gap-y-1">
               {raceState.finished.map((id, i) => {
                 const h = horses.find(x => x.id === id)
+                const isDnf = raceState.dnf.includes(id)
+                const placedFinishers = raceState.finished.filter(fid => !raceState.dnf.includes(fid))
+                const placeIdx = isDnf ? -1 : placedFinishers.indexOf(id)
                 return (
                   <div key={id} className="flex items-center gap-1.5 text-sm">
-                    <span>{MEDAL[i] || `#${i + 1}`}</span>
-                    <span className={humanBet?.horseId === id ? 'text-yellow-400 font-bold' : 'text-slate-300'}>
+                    {isDnf
+                      ? <span className="text-red-600 font-black text-xs">DNF</span>
+                      : <span>{MEDAL[placeIdx] || `#${placeIdx + 1}`}</span>
+                    }
+                    <span className={isDnf ? 'text-slate-600' : humanBet?.horseId === id ? 'text-yellow-400 font-bold' : 'text-slate-300'}>
                       {h?.name}
                     </span>
                   </div>

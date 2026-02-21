@@ -5,14 +5,15 @@ const MEDAL = ['🥇', '🥈', '🥉']
 
 export default function ResultsScreen({ gs, onNext, onForfeit }) {
   const { lastResult, players, day, race, gameOver, dayStartBux } = gs
-  const { finishOrder, horses, odds, bets, raceDay, raceNum, raceType, raceDistance } = lastResult
+  const { finishOrder, dnf = [], horses, odds, bets, raceDay, raceNum, raceType, raceDistance } = lastResult
 
   const human = players.find(p => p.isHuman)
   const humanBet = bets[human.id]
   const humanBetHorse = humanBet ? horses.find(h => h.id === humanBet.horseId) : null
-  const winner = horses.find(h => h.id === finishOrder[0])
-  const humanWon = humanBet?.horseId === finishOrder[0]
-  const payout = humanWon ? Math.floor(humanBet.amount * odds[humanBet.horseId]) : 0
+  const winnerId = finishOrder.find(id => !dnf.includes(id))
+  const winner = horses.find(h => h.id === winnerId)
+  const humanWon = humanBet?.horseId === winnerId
+  const payout = humanWon ? Math.floor(humanBet.amount * odds[winnerId]) : 0
   const net = humanWon ? payout - humanBet.amount : -(humanBet?.amount || 0)
 
   const isBust = human.bux <= 0
@@ -48,38 +49,46 @@ export default function ResultsScreen({ gs, onNext, onForfeit }) {
             <div className="text-6xl mb-3">🏆</div>
             <div className="text-slate-400 text-xs uppercase tracking-widest mb-1">Winner</div>
             <div className="text-4xl font-black text-white">{winner?.name}</div>
-            <div className="text-slate-500 mt-1">{odds[finishOrder[0]]}x odds</div>
+            <div className="text-slate-500 mt-1">{odds[winnerId]}x odds</div>
           </div>
 
           <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-800">
               <div className="text-slate-500 text-xs font-bold uppercase tracking-widest">Race Results</div>
             </div>
-            {finishOrder.map((id, i) => {
-              const horse = horses.find(h => h.id === id)
-              const isBet = humanBet?.horseId === id
-              const totalBet = Object.values(bets).filter(b => b.horseId === id).reduce((s, b) => s + b.amount, 0)
-              return (
-                <div
-                  key={id}
-                  className={`flex items-center justify-between px-5 py-3 ${
-                    i < finishOrder.length - 1 ? 'border-b border-slate-800' : ''
-                  } ${i === 0 ? 'bg-slate-800/30' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl w-9">{MEDAL[i] || `#${i + 1}`}</span>
-                    <div className="w-6 h-6 rounded-full flex-shrink-0" style={{ backgroundColor: horse?.color }} />
-                    <span className={`font-semibold text-lg ${isBet ? 'text-yellow-400' : 'text-white'}`}>
-                      {horse?.name}{isBet ? ' ⭐' : ''}
-                    </span>
+            {(() => {
+              const placedFinishers = finishOrder.filter(id => !dnf.includes(id))
+              return finishOrder.map((id, i) => {
+                const horse = horses.find(h => h.id === id)
+                const isBet = humanBet?.horseId === id
+                const isDnf = dnf.includes(id)
+                const placeIdx = isDnf ? -1 : placedFinishers.indexOf(id)
+                const totalBet = Object.values(bets).filter(b => b.horseId === id).reduce((s, b) => s + b.amount, 0)
+                return (
+                  <div
+                    key={id}
+                    className={`flex items-center justify-between px-5 py-3 ${
+                      i < finishOrder.length - 1 ? 'border-b border-slate-800' : ''
+                    } ${placeIdx === 0 ? 'bg-slate-800/30' : ''} ${isDnf ? 'opacity-50' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {isDnf
+                        ? <span className="text-xs font-black text-red-600 w-9">DNF</span>
+                        : <span className="text-xl w-9">{MEDAL[placeIdx] || `#${placeIdx + 1}`}</span>
+                      }
+                      <div className="w-6 h-6 rounded-full flex-shrink-0" style={{ backgroundColor: horse?.color }} />
+                      <span className={`font-semibold text-lg ${isBet ? 'text-yellow-400' : isDnf ? 'text-slate-500' : 'text-white'}`}>
+                        {horse?.name}{isBet ? ' ⭐' : ''}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      {!isDnf && <div className="text-slate-400">{odds[id]}x</div>}
+                      {totalBet > 0 && <div className="text-slate-600 text-xs">{totalBet}🪙 bet</div>}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-slate-400">{odds[id]}x</div>
-                    {totalBet > 0 && <div className="text-slate-600 text-xs">{totalBet}🪙 bet</div>}
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })
+            })()}
           </div>
         </div>
 

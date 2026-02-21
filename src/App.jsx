@@ -54,10 +54,12 @@ export default function App() {
     setScreen('racing')
   }
 
-  const handleRaceComplete = (finishOrder) => {
+  const handleRaceComplete = (finishOrder, dnf = []) => {
     setGs(prev => {
       const { players, currentBets, currentRace, day, race } = prev
-      const updatedPlayers = applyBetResults(players, currentBets, finishOrder[0], currentRace.odds)
+      // Winner is the first non-DNF finisher
+      const winner = finishOrder.find(id => !dnf.includes(id))
+      const updatedPlayers = applyBetResults(players, currentBets, winner, currentRace.odds)
       const human = updatedPlayers.find(p => p.isHuman)
       savePlayerData(human.name, human.bux)
 
@@ -70,6 +72,7 @@ export default function App() {
         players: updatedPlayers,
         lastResult: {
           finishOrder,
+          dnf,
           horses: currentRace.horses,
           odds: currentRace.odds,
           bets: currentBets,
