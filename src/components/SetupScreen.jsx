@@ -88,13 +88,32 @@ export default function SetupScreen({ onStart, savedData }) {
       )}
 
       {/* Legal footer */}
-      <div className="mt-8 max-w-md text-center space-y-1">
+      <div className="mt-8 max-w-md text-center space-y-2">
         <p className="text-slate-600 text-xs">
           © {new Date().getFullYear()} Seed 13 Productions. All rights reserved.
         </p>
         <p className="text-slate-700 text-xs leading-relaxed">
           For entertainment purposes only. This game does not involve real money, real wagering,
           or any form of gambling. No actual currency or items of value may be won or lost.
+        </p>
+        <p className="text-slate-700 text-xs leading-relaxed pt-1 border-t border-slate-800">
+          If you or someone you know has a gambling problem,{' '}
+          <a
+            href="https://www.ncpgambling.org/help-treatment/national-helpline-1-800-522-4700/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-500 underline hover:text-slate-400 transition-colors"
+          >
+            help is available
+          </a>
+          . Call or text the National Problem Gambling Helpline:{' '}
+          <a
+            href="tel:+18005224700"
+            className="text-slate-500 underline hover:text-slate-400 transition-colors"
+          >
+            1-800-522-4700
+          </a>{' '}
+          (24/7, free, confidential).
         </p>
       </div>
     </div>
