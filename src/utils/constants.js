@@ -64,6 +64,13 @@ export const STAT_WEIGHTS = {
   },
 };
 
+// Loan shark configuration
+export const LOAN_SHARK = {
+  VIG_RATE: 0.25,         // 25% vig per race on outstanding balance
+  MAX_LOAN_FACTOR: 0.50,  // max loan = 50% of day-start bux
+  MIN_LOAN: 10,           // minimum available even if dayStartBux is tiny
+};
+
 // Betting configuration
 export const BETTING_CONFIG = {
   INCREMENTS: [1, 5, 10, 25, 'All'],
@@ -140,6 +147,7 @@ export const STAT_RANGES = {
 
 export default {
   PLAYER_DATA_KEY,
+  LOAN_SHARK,
   GAME_CONFIG,
   COME_FROM_BEHIND,
   RACE_CONFIG,

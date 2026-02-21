@@ -8,6 +8,7 @@ import { GAME_CONFIG } from './utils/constants'
 import {
   generateRace, calculateOdds, createPlayer, createAIPlayer,
   makeAIBet, applyBetResults, savePlayerData, loadPlayerData, clearPlayerData,
+  takeLoan, repayLoan, accrueVig,
 } from './utils/gameLogic'
 import './App.css'
 
@@ -24,6 +25,7 @@ export default function App() {
     setGs({
       day: 1,
       race: 1,
+      dayStartBux: GAME_CONFIG.STARTING_BUX,
       players: [
         createPlayer(playerName, true),
         ...Array.from({ length: numAI }, (_, i) => createAIPlayer(i)),
@@ -61,6 +63,7 @@ export default function App() {
 
       const isLastRace = race >= GAME_CONFIG.RACES_PER_DAY
       const isLastDay = isLastRace && day >= GAME_CONFIG.MAX_GAME_DAYS
+      const isNewDay = isLastRace && !isLastDay
 
       return {
         ...prev,
@@ -76,18 +79,47 @@ export default function App() {
           raceDistance: currentRace.distance,
         },
         currentBets: {},
-        day: isLastRace && !isLastDay ? day + 1 : day,
+        day: isNewDay ? day + 1 : day,
         race: isLastRace ? (isLastDay ? race : 1) : race + 1,
         currentRace: isLastDay ? null : newRace(),
         gameOver: isLastDay,
+        // Reset dayStartBux at the start of each new day
+        dayStartBux: isNewDay ? human.bux : prev.dayStartBux,
       }
     })
     setScreen('results')
   }
 
   const handleNext = () => {
-    if (gs.gameOver) setScreen('game-over')
-    else setScreen('betting')
+    if (gs.gameOver) {
+      setScreen('game-over')
+      return
+    }
+    // Accrue vig on outstanding loan before the next betting screen
+    setGs(prev => ({
+      ...prev,
+      players: prev.players.map(p => p.isHuman ? accrueVig(p) : p),
+    }))
+    setScreen('betting')
+  }
+
+  const handleForfeit = () => {
+    setGs(prev => ({ ...prev, gameOver: true }))
+    setScreen('game-over')
+  }
+
+  const handleLoan = (amount) => {
+    setGs(prev => ({
+      ...prev,
+      players: prev.players.map(p => p.isHuman ? takeLoan(p, amount) : p),
+    }))
+  }
+
+  const handleRepay = (amount) => {
+    setGs(prev => ({
+      ...prev,
+      players: prev.players.map(p => p.isHuman ? repayLoan(p, amount) : p),
+    }))
   }
 
   const handleNewGame = () => {
@@ -102,7 +134,13 @@ export default function App() {
         <SetupScreen onStart={handleStart} savedData={loadPlayerData()} />
       )}
       {screen === 'betting' && gs && (
-        <BettingScreen gs={gs} onRace={startRace} />
+        <BettingScreen
+          gs={gs}
+          onRace={startRace}
+          onLoan={handleLoan}
+          onRepay={handleRepay}
+          onForfeit={handleForfeit}
+        />
       )}
       {screen === 'racing' && gs && (
         <RaceTrack
@@ -113,7 +151,7 @@ export default function App() {
         />
       )}
       {screen === 'results' && gs && (
-        <ResultsScreen gs={gs} onNext={handleNext} />
+        <ResultsScreen gs={gs} onNext={handleNext} onForfeit={handleForfeit} />
       )}
       {screen === 'game-over' && gs && (
         <GameOver players={gs.players} onNewGame={handleNewGame} />

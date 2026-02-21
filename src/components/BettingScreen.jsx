@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { GAME_CONFIG } from '../utils/constants'
+import { GAME_CONFIG, LOAN_SHARK } from '../utils/constants'
+import { maxLoanAvailable } from '../utils/gameLogic'
 
 const STAT_LABEL = { topSpeed: 'Speed', stamina: 'Stamina', sprint: 'Sprint', pace: 'Pace', gate: 'Gate' }
 const TYPE_COLOR = { Short: 'text-green-400', Medium: 'text-blue-400', Long: 'text-purple-400' }
@@ -21,13 +22,96 @@ function StatDots({ value, max = 10 }) {
   )
 }
 
-export default function BettingScreen({ gs, onRace }) {
-  const { day, race, players, currentRace } = gs
+function LoanSharkPanel({ human, dayStartBux, onLoan, onRepay }) {
+  const canBorrow = maxLoanAvailable(human, dayStartBux)
+  const hasLoan = (human.loanBalance || 0) > 0
+  const nextVig = hasLoan ? Math.ceil(human.loanBalance * LOAN_SHARK.VIG_RATE) : 0
+  const maxRepay = Math.min(human.bux, human.loanBalance || 0)
+  const repayOptions = [5, 10, 25, 50].filter(a => a < maxRepay)
+
+  return (
+    <div className={`rounded-xl border overflow-hidden ${hasLoan ? 'border-red-800' : 'border-slate-700'}`}>
+      <div className={`px-4 py-2.5 flex items-center gap-2 ${hasLoan ? 'bg-red-950/60' : 'bg-slate-800/60'}`}>
+        <span className="text-lg">🦈</span>
+        <span className="text-xs font-black uppercase tracking-widest text-slate-300">The Loan Shark</span>
+        {hasLoan && (
+          <span className="ml-auto text-xs text-red-400 font-bold">
+            Vig: {Math.round(LOAN_SHARK.VIG_RATE * 100)}%/race
+          </span>
+        )}
+      </div>
+
+      <div className="bg-slate-900 p-3 space-y-3">
+        {hasLoan && (
+          <div className="space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-400">Outstanding</span>
+              <span className="text-red-400 font-bold">{human.loanBalance}🪙</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500">Next vig (after this race)</span>
+              <span className="text-orange-400 font-semibold">+{nextVig}🪙</span>
+            </div>
+          </div>
+        )}
+
+        {canBorrow > 0 && (
+          <div>
+            <div className="text-slate-500 text-xs mb-1.5">
+              Credit available: <span className="text-slate-300 font-semibold">{canBorrow}🪙</span>
+            </div>
+            <button
+              onClick={() => onLoan(canBorrow)}
+              className="w-full py-2 bg-amber-700 hover:bg-amber-600 text-white font-bold rounded-lg text-sm transition-all"
+            >
+              Borrow {canBorrow}🪙
+            </button>
+          </div>
+        )}
+
+        {canBorrow === 0 && !hasLoan && (
+          <div className="text-slate-600 text-xs text-center py-1">No credit available today</div>
+        )}
+
+        {hasLoan && maxRepay > 0 && (
+          <div>
+            <div className="text-slate-500 text-xs mb-1.5">Repay</div>
+            <div className="flex flex-wrap gap-1.5">
+              {repayOptions.map(amt => (
+                <button
+                  key={amt}
+                  onClick={() => onRepay(amt)}
+                  className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition-all"
+                >
+                  {amt}🪙
+                </button>
+              ))}
+              <button
+                onClick={() => onRepay(maxRepay)}
+                className="flex-1 py-1.5 bg-green-900 hover:bg-green-800 text-green-300 text-xs font-bold rounded-lg transition-all"
+              >
+                All ({maxRepay}🪙)
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function BettingScreen({ gs, onRace, onLoan, onRepay, onForfeit }) {
+  const { day, race, players, currentRace, dayStartBux } = gs
   const { horses, type, distance, odds } = currentRace
 
   const human = players.find(p => p.isHuman)
   const [selectedId, setSelectedId] = useState(null)
   const [betAmount, setBetAmount] = useState(0)
+
+  const isBust = human.bux <= 0
+  const canBorrow = maxLoanAvailable(human, dayStartBux)
+  const hasLoan = (human.loanBalance || 0) > 0
+  const showShark = hasLoan || isBust || human.bux < 25
 
   const sorted = [...horses].sort((a, b) => odds[a.id] - odds[b.id])
   const betOptions = [1, 5, 10, 25].filter(b => b <= human.bux)
@@ -49,7 +133,6 @@ export default function BettingScreen({ gs, onRace }) {
           </div>
         </div>
         <div className="flex items-center gap-8">
-          {/* Live standings */}
           <div className="hidden md:flex items-center gap-4">
             {[...players].sort((a, b) => b.bux - a.bux).map((p, i) => (
               <div key={p.id} className={`text-sm ${p.isHuman ? 'text-yellow-400 font-bold' : 'text-slate-400'}`}>
@@ -59,10 +142,38 @@ export default function BettingScreen({ gs, onRace }) {
           </div>
           <div className="border-l border-slate-700 pl-6">
             <div className="text-slate-500 text-xs">Your balance</div>
-            <div className="text-yellow-400 font-black text-2xl leading-none">{human.bux}🪙</div>
+            <div className={`font-black text-2xl leading-none ${isBust ? 'text-red-400' : 'text-yellow-400'}`}>
+              {human.bux}🪙
+            </div>
+            {hasLoan && (
+              <div className="text-red-500 text-xs mt-0.5">owes {human.loanBalance}🪙</div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Bust banner */}
+      {isBust && (
+        <div className="bg-red-950/80 border-b border-red-800 px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">💸</span>
+            <div>
+              <div className="text-red-400 font-black text-lg">You're Broke!</div>
+              <div className="text-red-500 text-sm">
+                {canBorrow > 0
+                  ? 'See the shark in the sidebar to borrow, or forfeit.'
+                  : 'No credit remaining. Watch the race or forfeit.'}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onForfeit}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-sm font-bold rounded-lg transition-all"
+          >
+            Forfeit Game
+          </button>
+        </div>
+      )}
 
       {/* Two-column body */}
       <div className="flex-1 flex min-h-0">
@@ -83,15 +194,12 @@ export default function BettingScreen({ gs, onRace }) {
                 }`}
               >
                 <div className="flex items-center gap-3 p-3">
-                  {/* Color badge */}
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0"
                     style={{ backgroundColor: horse.color }}
                   >
                     {horse.number}
                   </div>
-
-                  {/* Name & jockey */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-white text-lg">{horse.name}</span>
@@ -105,8 +213,6 @@ export default function BettingScreen({ gs, onRace }) {
                       🏇 {horse.jockey} · ❤️ {horse.health}/10
                     </div>
                   </div>
-
-                  {/* Stats (always visible) */}
                   <div className="hidden lg:flex items-center gap-4 flex-shrink-0">
                     {Object.entries(horse.stats).map(([stat, val]) => (
                       <div key={stat} className="text-center">
@@ -115,15 +221,11 @@ export default function BettingScreen({ gs, onRace }) {
                       </div>
                     ))}
                   </div>
-
-                  {/* Odds */}
                   <div className="text-right flex-shrink-0 ml-4">
                     <div className="text-yellow-400 font-black text-2xl leading-none">{odds[horse.id]}x</div>
                     <div className="text-slate-600 text-xs">odds</div>
                   </div>
                 </div>
-
-                {/* Expanded stats on smaller screens */}
                 {isSelected && (
                   <div className="lg:hidden px-3 pb-3 pt-1 border-t border-slate-800">
                     <div className="grid grid-cols-5 gap-3">
@@ -142,11 +244,10 @@ export default function BettingScreen({ gs, onRace }) {
           })}
         </div>
 
-        {/* Right: bet panel — fixed width sidebar */}
+        {/* Right: bet panel */}
         <div className="w-72 flex-shrink-0 border-l border-slate-800 flex flex-col bg-slate-900/50">
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
-            {/* Selected horse */}
             {selected ? (
               <div>
                 <div className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-3">
@@ -168,12 +269,13 @@ export default function BettingScreen({ gs, onRace }) {
             ) : (
               <div className="text-center py-8">
                 <div className="text-4xl mb-2">🐎</div>
-                <div className="text-slate-500 text-sm">Select a horse to bet on</div>
+                <div className="text-slate-500 text-sm">
+                  {isBust ? 'Borrow from the shark to keep playing' : 'Select a horse to bet on'}
+                </div>
               </div>
             )}
 
-            {/* Bet amount */}
-            {selected && (
+            {selected && !isBust && (
               <div>
                 <div className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-2">
                   Bet amount
@@ -214,7 +316,15 @@ export default function BettingScreen({ gs, onRace }) {
               </div>
             )}
 
-            {/* Mobile standings */}
+            {showShark && (
+              <LoanSharkPanel
+                human={human}
+                dayStartBux={dayStartBux}
+                onLoan={onLoan}
+                onRepay={onRepay}
+              />
+            )}
+
             <div className="md:hidden">
               <div className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-2">Standings</div>
               {[...players].sort((a, b) => b.bux - a.bux).map((p, i) => (
@@ -228,7 +338,7 @@ export default function BettingScreen({ gs, onRace }) {
             </div>
           </div>
 
-          {/* Actions — pinned to bottom */}
+          {/* Actions */}
           <div className="p-4 border-t border-slate-800 space-y-2">
             <button
               onClick={() => canBet && onRace(selectedId, betAmount)}
@@ -245,7 +355,7 @@ export default function BettingScreen({ gs, onRace }) {
               onClick={() => onRace(null, 0)}
               className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl font-semibold transition-all text-sm"
             >
-              Skip Bet
+              {isBust ? 'Watch Race (no bet)' : 'Skip Bet'}
             </button>
           </div>
         </div>

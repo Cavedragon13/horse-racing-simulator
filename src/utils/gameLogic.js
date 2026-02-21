@@ -1,7 +1,7 @@
 import {
   RACE_CONFIG, STAT_WEIGHTS, GAME_CONFIG, COME_FROM_BEHIND,
   HORSE_COLORS, HORSE_NUMBERS, AI_BETTING, HEALTH_MODIFIERS,
-  STAT_RANGES, BETTING_CONFIG, RACE_PHASES, PLAYER_DATA_KEY,
+  STAT_RANGES, BETTING_CONFIG, RACE_PHASES, PLAYER_DATA_KEY, LOAN_SHARK,
 } from './constants.js';
 
 const HORSE_NAMES = [
@@ -190,7 +190,38 @@ export function createPlayer(name, isHuman = true) {
     id: `p-${Math.random().toString(36).substr(2, 9)}`,
     name, bux: GAME_CONFIG.STARTING_BUX, isHuman,
     wins: 0, totalWon: 0, totalLost: 0,
+    loanBalance: 0,
   };
+}
+
+// Returns how many bux the player can still borrow today
+export function maxLoanAvailable(player, dayStartBux) {
+  const cap = Math.max(LOAN_SHARK.MIN_LOAN, Math.floor(dayStartBux * LOAN_SHARK.MAX_LOAN_FACTOR));
+  return Math.max(0, cap - (player.loanBalance || 0));
+}
+
+export function takeLoan(player, amount) {
+  return {
+    ...player,
+    bux: player.bux + amount,
+    loanBalance: (player.loanBalance || 0) + amount,
+  };
+}
+
+export function repayLoan(player, amount) {
+  const actual = Math.min(amount, player.loanBalance || 0, player.bux);
+  return {
+    ...player,
+    bux: player.bux - actual,
+    loanBalance: (player.loanBalance || 0) - actual,
+  };
+}
+
+// Accrue vig on outstanding balance — called between each race
+export function accrueVig(player) {
+  if (!player.loanBalance || player.loanBalance <= 0) return player;
+  const vig = Math.ceil(player.loanBalance * LOAN_SHARK.VIG_RATE);
+  return { ...player, loanBalance: player.loanBalance + vig };
 }
 
 export function createAIPlayer(index) {
