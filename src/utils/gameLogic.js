@@ -125,6 +125,7 @@ export function initRaceState(horses, raceType) {
     positions,
     speeds,
     finished: [],
+    dnf: [],
     tick: 0,
     comeFromBehind: { usedThisRace: 0, activeHorse: null, endTick: null },
     done: false,
