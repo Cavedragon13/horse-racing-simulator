@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  base: '/horse-racing-simulator/',
   server: {
     port: 8030,
     strictPort: true,   // fail instead of silently grabbing another port
