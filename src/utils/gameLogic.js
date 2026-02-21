@@ -125,7 +125,6 @@ export function initRaceState(horses, raceType) {
     positions,
     speeds,
     finished: [],
-    dnf: [],
     tick: 0,
     comeFromBehind: { usedThisRace: 0, activeHorse: null, endTick: null },
     done: false,
@@ -137,7 +136,6 @@ export function tickRace(state, horses) {
 
   const newPositions = { ...state.positions };
   const newFinished = [...state.finished];
-  const newDnf = [...state.dnf];
   let cfb = { ...state.comeFromBehind };
   const tick = state.tick + 1;
 
@@ -183,19 +181,9 @@ export function tickRace(state, horses) {
     if (newPos >= 1.0) newFinished.push(horse.id);
   });
 
-  // DNF: if at least one horse finished and all remaining are under 50%, pull them
-  if (newFinished.length > 0) {
-    const stillRunning = horses.filter(h => !newFinished.includes(h.id));
-    if (stillRunning.length > 0 && stillRunning.every(h => newPositions[h.id] < 0.5)) {
-      stillRunning.forEach(h => {
-        newFinished.push(h.id);
-        newDnf.push(h.id);
-      });
-    }
-  }
-
-  const done = newFinished.length === horses.length;
-  return { ...state, positions: newPositions, finished: newFinished, dnf: newDnf, tick, comeFromBehind: cfb, done };
+  // Race ends once win/place/show are decided (3 finishers)
+  const done = newFinished.length >= 3;
+  return { ...state, positions: newPositions, finished: newFinished, dnf: [], tick, comeFromBehind: cfb, done };
 }
 
 export function createPlayer(name, isHuman = true) {
